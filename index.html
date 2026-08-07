@@ -790,8 +790,21 @@ function levenshtein(a,b){
   for(let i=1;i<=b.length;i++)for(let j=1;j<=a.length;j++)m[i][j]=b[i-1]===a[j-1]?m[i-1][j-1]:1+Math.min(m[i-1][j],m[i][j-1],m[i-1][j-1]);
   return m[b.length][a.length];
 }
-function prepareFlashcards(){
-  flashDeck=selectStudyWords(Math.min(40,activePriorityWords().length));flashIndex=0;renderFlashcard();
+function prepareFlashcards() {
+  flashDeck = selectStudyWords(
+    Math.min(40, activePriorityWords().length)
+  );
+
+  flashIndex = 0;
+
+  // Reactiva los botones al comenzar una sesión nueva.
+  document
+    .querySelectorAll("#flashRatings button")
+    .forEach(button => {
+      button.disabled = false;
+    });
+
+  renderFlashcard();
 }
 function renderFlashcard(){
   const w=flashDeck[flashIndex];if(!w){$("flashWord").textContent="Sin palabras";return}
@@ -801,8 +814,54 @@ function renderFlashcard(){
   $("flashSynonyms").innerHTML=(w.synonyms||[]).slice(0,6).map(s=>`<span class="chip">${esc(s)}</span>`).join("");
   $("flashCounter").textContent=`Tarjeta ${flashIndex+1} / ${flashDeck.length}`;$("flashProgress").style.width=`${flashDeck.length?(flashIndex+1)/flashDeck.length*100:0}%`;
 }
-function rateFlash(rating){
-  const w=flashDeck[flashIndex];if(!w)return;scheduleWord(w,rating,rating>0);flashIndex=(flashIndex+1)%flashDeck.length;renderFlashcard();updateDashboard();
+function rateFlash(rating) {
+  const w = flashDeck[flashIndex];
+
+  if (!w) return;
+
+  // Guarda el resultado y programa el próximo repaso.
+  scheduleWord(w, rating, rating > 0);
+
+  // Retira la tarjeta actual de esta sesión.
+  flashDeck.splice(flashIndex, 1);
+
+  // “Otra vez” vuelve al final del mazo.
+  if (rating === 0) {
+    flashDeck.push(w);
+  }
+
+  // Cuando ya no quedan tarjetas, termina la sesión.
+  if (flashDeck.length === 0) {
+    $("flashcard").classList.remove("flipped");
+
+    $("flashWord").textContent = "Sesión completada";
+    $("flashIpa").textContent = "No quedan tarjetas pendientes.";
+    $("flashCounter").textContent = "Sesión terminada";
+    $("flashProgress").style.width = "100%";
+
+    $("flashPos").textContent = "";
+    $("flashDefinition").textContent = "";
+    $("flashSpanish").textContent = "";
+    $("flashExample").textContent = "";
+    $("flashSynonyms").innerHTML = "";
+
+    document
+      .querySelectorAll("#flashRatings button")
+      .forEach(button => {
+        button.disabled = true;
+      });
+
+    updateDashboard();
+    return;
+  }
+
+  // Evita que el índice quede fuera del nuevo mazo.
+  if (flashIndex >= flashDeck.length) {
+    flashIndex = 0;
+  }
+
+  renderFlashcard();
+  updateDashboard();
 }
 function startMatch(){
   clearInterval(matchState?.timer);
